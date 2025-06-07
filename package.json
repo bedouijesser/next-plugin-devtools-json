@@ -1,6 +1,6 @@
 {
   "name": "next-plugin-devtools-json",
-  "version": "1.0.3",
+  "version": "2.0.0",
   "description": "Next.js plugin for generating the Chrome DevTools project settings file on-the-fly in the dev server",
   "type": "module",
   "main": "dist/index.cjs",

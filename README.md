@@ -1,21 +1,45 @@
-# Next.js Plugin for DevTools Project Settings (devtools.json)
+# next-plugin-devtools-json
 
-Next.js plugin for generating the Chrome DevTools project settings file on-the-fly in the dev server.
+A Next.js plugin that provides a plug-and-play solution for serving a Chrome DevTools project settings JSON endpoint at `/.well-known/appspecific/com.chrome.devtools.json`. This plugin enables seamless integration between Chrome DevTools and your Next.js project workspace.
 
-This enables seamless integration with the new Chrome DevTools features:
+## ✨ Features
 
-- **DevTools Project Settings (devtools.json)**, and
-- **Automatic Workspace folders**.
+- 🔌 **One-command setup** - Automatic configuration with `npx`
+- 🔧 **Auto-config** - Automatically updates your `next.config.js`
+- 🔄 **Automatic UUID management** - Generates and persists project UUIDs
+- 🏗️ **Multi-router support** - Works with both App Router and Pages Router
+- 📁 **Flexible structure** - Supports both root and `src/` directory structures
+- 🚫 **No external dependencies** - UUID generation built-in
+- ⚡ **Zero configuration** - Works out of the box with sensible defaults
 
-## Installation
+## 🚀 Quick Start
+
+### One-command setup (Recommended)
 
 ```bash
-npm install -D next-plugin-devtools-json
+npx next-plugin-devtools-json
 ```
 
-## Usage
+**That's it!** This single command will:
+- ✅ Detect your Next.js structure (App Router/Pages Router, root/src)
+- ✅ Create the appropriate API route file (no external dependencies)
+- ✅ Automatically add the plugin to your `next.config.js` (or create one)
+- ✅ Configure everything for you
 
-Add it to your Next.js config (`next.config.js`):
+Start your Next.js development server and the endpoint will be available at:
+```
+/.well-known/appspecific/com.chrome.devtools.json
+```
+
+### Manual Installation
+
+If you prefer manual setup:
+
+```bash
+npm install next-plugin-devtools-json
+```
+
+Then update your `next.config.js`:
 
 ```javascript
 const withDevToolsJSON = require('next-plugin-devtools-json');
@@ -28,38 +52,144 @@ const nextConfig = {
 module.exports = withDevToolsJSON()(nextConfig);
 ```
 
-Or with ES modules (`next.config.mjs`):
+And create the API route:
+```bash
+npx next-plugin-devtools-json
+```
+
+## 📖 How It Works
+
+The plugin:
+
+1. **Creates an API route** that generates the DevTools JSON response
+2. **Adds a rewrite rule** to map `/.well-known/appspecific/com.chrome.devtools.json` to your API route
+3. **Manages UUIDs** automatically in `.next/cache/devtools-uuid.json`
+4. **No external dependencies** - uses built-in UUID generation
+
+## 🔧 Configuration
+
+### Basic usage
 
 ```javascript
+const withDevToolsJSON = require('next-plugin-devtools-json');
+
+module.exports = withDevToolsJSON()(nextConfig);
+```
+
+### With options
+
+```javascript
+const withDevToolsJSON = require('next-plugin-devtools-json');
+
+module.exports = withDevToolsJSON({
+  uuid: 'your-custom-uuid', // Optional: provide a custom UUID
+  enabled: process.env.NODE_ENV === 'development', // Optional: only enable in development
+})(nextConfig);
+```
+
+### TypeScript/ESM Configuration
+
+```typescript
 import withDevToolsJSON from 'next-plugin-devtools-json';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // your existing config
+  // your config
 };
 
 export default withDevToolsJSON()(nextConfig);
 ```
 
-While the plugin can generate a UUID and save it in Next.js cache, you can also specify it in the options like in the following:
+## 📁 Supported Project Structures
 
-```javascript
-module.exports = withDevToolsJSON({ 
-  uuid: "6ec0bd7f-11c0-43da-975e-2a8ad9ebae0b" 
-})(nextConfig);
+The plugin automatically detects and supports all common Next.js structures:
+
+### App Router
+```
+your-project/
+├── app/api/devtools-json/route.js    # Auto-created
+└── next.config.js                    # Auto-updated
 ```
 
-### API Route Setup
+### App Router with src/
+```
+your-project/
+├── src/app/api/devtools-json/route.js # Auto-created
+└── next.config.js                     # Auto-updated
+```
 
-The plugin requires an API route to handle the DevTools JSON endpoint. You can set this up manually or use our CLI tool:
+### Pages Router
+```
+your-project/
+├── pages/api/devtools-json.js         # Auto-created
+└── next.config.js                     # Auto-updated
+```
 
-#### Automatic Setup (Recommended)
+### Pages Router with src/
+```
+your-project/
+├── src/pages/api/devtools-json.js     # Auto-created
+└── next.config.js                     # Auto-updated
+```
+
+## 🔍 API Response
+
+The endpoint returns a JSON response with your workspace information:
+
+```json
+{
+  "workspace": {
+    "root": "/path/to/your/project",
+    "uuid": "generated-or-custom-uuid"
+  }
+}
+```
+
+## 🛠️ Development
+
+### Building the plugin
 
 ```bash
-npx setup-devtools-json
+npm run build
 ```
 
-This will automatically detect your Next.js structure (Pages Router vs App Router) and create the appropriate API route.
+### Running tests
+
+```bash
+npm test
+```
+
+## 📋 Requirements
+
+- Next.js 12.0.0 or later
+- Node.js 14.0.0 or later
+
+## 🔄 Migrating from Manual Setup
+
+If you previously set up the plugin manually:
+
+1. Run `npx next-plugin-devtools-json` in your project
+2. The CLI will detect existing configurations and update them as needed
+3. Remove any manual `uuid` dependencies if desired (the plugin includes its own generator)
+
+## 🆚 Comparison
+
+| Feature | Before | After |
+|---------|--------|-------|
+| Setup steps | 5+ manual steps | 1 command |
+| Dependencies | Requires `uuid` package | Zero dependencies |
+| Config updates | Manual editing | Automatic |
+| Structure detection | Manual | Automatic |
+| File creation | Manual | Automatic |
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+MIT
+- Handle both `app/api/devtools-json/route.js` and `pages/api/devtools-json.js` patterns
 
 #### Manual Setup
 
@@ -225,6 +355,33 @@ module.exports = withDevToolsJSON({
 
 - **`uuid`** (string, optional): Provide a custom UUID instead of auto-generating one
 - **`enabled`** (boolean, optional): Control when the plugin is active (defaults to development mode only)
+
+## Available Commands
+
+The package provides multiple ways to set up the API route:
+
+### npx next-plugin-devtools-json@latest (Recommended)
+```bash
+npx next-plugin-devtools-json@latest
+```
+- ✅ Always uses the latest version
+- ✅ No installation required
+- ✅ Works immediately in any Next.js project
+
+### npx setup-devtools-json
+```bash
+npm install next-plugin-devtools-json
+npx setup-devtools-json
+```
+- ✅ Use after installing the package
+- ✅ Available as a local command
+- ✅ Same functionality as above
+
+Both commands will:
+- Detect your project structure (App Router vs Pages Router)
+- Handle both root directory and `src/` directory layouts
+- Create the appropriate API route file
+- Show clear next steps for configuration
 
 ## Troubleshooting
 

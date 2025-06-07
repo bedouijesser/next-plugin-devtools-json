@@ -30,8 +30,6 @@ function withDevToolsJSON(options = {}) {
             fallback: originalRewrites.fallback || [],
           };
         }
-          };
-        }
 
         return {
           beforeFiles: rewrites,

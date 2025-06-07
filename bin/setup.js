@@ -3,15 +3,19 @@
 import fs from 'fs';
 import path from 'path';
 
+// Simplified API templates without external uuid dependency
 const PAGES_API_TEMPLATE = `import fs from 'fs';
 import path from 'path';
-import { v4, validate } from 'uuid';
 
-async function getOrCreateUUID(projectRoot, providedUuid) {
-  if (providedUuid) {
-    return providedUuid;
-  }
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
+function getOrCreateUUID(projectRoot) {
   const cacheDir = path.resolve(projectRoot, '.next', 'cache');
   const uuidPath = path.resolve(cacheDir, 'devtools-uuid.json');
 
@@ -19,7 +23,7 @@ async function getOrCreateUUID(projectRoot, providedUuid) {
     try {
       const uuidContent = fs.readFileSync(uuidPath, { encoding: 'utf-8' });
       const uuid = uuidContent.trim();
-      if (validate(uuid)) {
+      if (uuid.length === 36 && uuid.split('-').length === 5) {
         return uuid;
       }
     } catch (error) {
@@ -31,22 +35,22 @@ async function getOrCreateUUID(projectRoot, providedUuid) {
     fs.mkdirSync(cacheDir, { recursive: true });
   }
 
-  const uuid = v4();
+  const uuid = generateUUID();
   fs.writeFileSync(uuidPath, uuid, { encoding: 'utf-8' });
-  console.log(\`Generated UUID '\${uuid}' for DevTools project settings.\`);
+  console.log('Generated UUID \\'' + uuid + '\\' for DevTools project settings.');
   return uuid;
 }
 
-export default async function handler(req, res) {
+export default function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
-    res.status(405).end(\`Method \${req.method} Not Allowed\`);
+    res.status(405).end('Method ' + req.method + ' Not Allowed');
     return;
   }
 
   try {
     const projectRoot = process.cwd();
-    const uuid = await getOrCreateUUID(projectRoot);
+    const uuid = getOrCreateUUID(projectRoot);
 
     const devtoolsJson = {
       workspace: {
@@ -65,14 +69,17 @@ export default async function handler(req, res) {
 
 const APP_API_TEMPLATE = `import fs from 'fs';
 import path from 'path';
-import { v4, validate } from 'uuid';
 import { NextResponse } from 'next/server';
 
-async function getOrCreateUUID(projectRoot, providedUuid) {
-  if (providedUuid) {
-    return providedUuid;
-  }
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
+function getOrCreateUUID(projectRoot) {
   const cacheDir = path.resolve(projectRoot, '.next', 'cache');
   const uuidPath = path.resolve(cacheDir, 'devtools-uuid.json');
 
@@ -80,7 +87,7 @@ async function getOrCreateUUID(projectRoot, providedUuid) {
     try {
       const uuidContent = fs.readFileSync(uuidPath, { encoding: 'utf-8' });
       const uuid = uuidContent.trim();
-      if (validate(uuid)) {
+      if (uuid.length === 36 && uuid.split('-').length === 5) {
         return uuid;
       }
     } catch (error) {
@@ -92,16 +99,16 @@ async function getOrCreateUUID(projectRoot, providedUuid) {
     fs.mkdirSync(cacheDir, { recursive: true });
   }
 
-  const uuid = v4();
+  const uuid = generateUUID();
   fs.writeFileSync(uuidPath, uuid, { encoding: 'utf-8' });
-  console.log(\`Generated UUID '\${uuid}' for DevTools project settings.\`);
+  console.log('Generated UUID \\'' + uuid + '\\' for DevTools project settings.');
   return uuid;
 }
 
 export async function GET() {
   try {
     const projectRoot = process.cwd();
-    const uuid = await getOrCreateUUID(projectRoot);
+    const uuid = getOrCreateUUID(projectRoot);
 
     const devtoolsJson = {
       workspace: {
@@ -159,12 +166,13 @@ function createApiRoute() {
     }
     
     if (fs.existsSync(filePath)) {
-      console.log(`⚠️  API route already exists at ${path.relative(process.cwd(), filePath)}`);
-      return;
+      console.log('⚠️  API route already exists at ' + path.relative(process.cwd(), filePath));
+      return filePath;
     }
     
     fs.writeFileSync(filePath, PAGES_API_TEMPLATE);
-    console.log(`✅ Created API route at ${path.relative(process.cwd(), filePath)}`);
+    console.log('✅ Created API route at ' + path.relative(process.cwd(), filePath));
+    return filePath;
     
   } else if (routerType === 'app') {
     // Determine if using src structure
@@ -180,26 +188,135 @@ function createApiRoute() {
     }
     
     if (fs.existsSync(filePath)) {
-      console.log(`⚠️  API route already exists at ${path.relative(process.cwd(), filePath)}`);
-      return;
+      console.log('⚠️  API route already exists at ' + path.relative(process.cwd(), filePath));
+      return filePath;
     }
     
     fs.writeFileSync(filePath, APP_API_TEMPLATE);
-    console.log(`✅ Created API route at ${path.relative(process.cwd(), filePath)}`);
+    console.log('✅ Created API route at ' + path.relative(process.cwd(), filePath));
+    return filePath;
   }
+}
+
+function findNextConfigFile() {
+  const cwd = process.cwd();
+  const possibleConfigs = [
+    'next.config.js',
+    'next.config.mjs', 
+    'next.config.ts',
+    'next.config.cjs'
+  ];
+  
+  for (const config of possibleConfigs) {
+    const configPath = path.join(cwd, config);
+    if (fs.existsSync(configPath)) {
+      return { path: configPath, name: config };
+    }
+  }
+  
+  return null;
+}
+
+function updateNextConfig() {
+  const configFile = findNextConfigFile();
+  
+  if (!configFile) {
+    console.log('⚠️  No next.config.js found. Creating one...');
+    const defaultConfig = `const withDevToolsJSON = require('next-plugin-devtools-json');
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {};
+
+module.exports = withDevToolsJSON()(nextConfig);
+`;
+    fs.writeFileSync(path.join(process.cwd(), 'next.config.js'), defaultConfig);
+    console.log('✅ Created next.config.js with DevTools JSON plugin');
+    return;
+  }
+  
+  const configPath = configFile.path;
+  const configContent = fs.readFileSync(configPath, 'utf-8');
+  
+  // Check if plugin is already added
+  if (configContent.includes('next-plugin-devtools-json') || configContent.includes('withDevToolsJSON')) {
+    console.log('⚠️  Plugin already configured in next.config');
+    return;
+  }
+  
+  // Determine if it's TypeScript or JavaScript
+  const isTypeScript = configFile.name.endsWith('.ts');
+  const isESM = configFile.name.endsWith('.mjs') || configContent.includes('import ') || configContent.includes('export ');
+  
+  let newConfigContent;
+  
+  if (isESM) {
+    // Handle ES modules
+    const importLine = "import withDevToolsJSON from 'next-plugin-devtools-json';\n";
+    
+    if (configContent.includes('export default')) {
+      // Handle different export default patterns
+      if (configContent.match(/export\s+default\s+\w+\s*;?\s*$/m)) {
+        // Pattern: export default variableName;
+        newConfigContent = importLine + configContent.replace(
+          /export\s+default\s+(\w+)\s*;?\s*$/m,
+          'export default withDevToolsJSON()($1);'
+        );
+      } else {
+        // Pattern: export default { ... } or other inline exports
+        newConfigContent = importLine + configContent.replace(
+          /export\s+default\s+([^;]+);?/,
+          'export default withDevToolsJSON()($1);'
+        );
+      }
+    } else {
+      // Fallback - add at the end
+      newConfigContent = importLine + configContent + '\n\nexport default withDevToolsJSON()(nextConfig);';
+    }
+  } else {
+    // Handle CommonJS
+    const requireLine = "const withDevToolsJSON = require('next-plugin-devtools-json');\n";
+    
+    if (configContent.includes('module.exports')) {
+      // Handle different module.exports patterns
+      if (configContent.match(/module\.exports\s*=\s*\w+\s*;?\s*$/m)) {
+        // Pattern: module.exports = variableName;
+        newConfigContent = requireLine + configContent.replace(
+          /module\.exports\s*=\s*(\w+)\s*;?\s*$/m,
+          'module.exports = withDevToolsJSON()($1);'
+        );
+      } else {
+        // Pattern: module.exports = { ... } or other inline exports
+        newConfigContent = requireLine + configContent.replace(
+          /module\.exports\s*=\s*([^;]+);?/,
+          'module.exports = withDevToolsJSON()($1);'
+        );
+      }
+    } else {
+      // Fallback - add at the end
+      newConfigContent = requireLine + configContent + '\n\nmodule.exports = withDevToolsJSON()(nextConfig);';
+    }
+  }
+  
+  // Write back the updated config
+  fs.writeFileSync(configPath, newConfigContent);
+  console.log('✅ Updated ' + configFile.name + ' to include DevTools JSON plugin');
 }
 
 function main() {
   console.log('🔧 Setting up Next.js DevTools JSON plugin...');
-  createApiRoute();
-  console.log('\\n📝 Next steps:');
-  console.log('1. Add the plugin to your next.config.js:');
-  console.log('   const withDevToolsJSON = require("next-plugin-devtools-json");');
-  console.log('   module.exports = withDevToolsJSON()(nextConfig);');
-  console.log('\\n2. Install the uuid dependency if not already installed:');
-  console.log('   npm install uuid');
-  console.log('\\n✨ Setup complete! Your DevTools JSON endpoint will be available at:');
+  
+  // Step 1: Create API route
+  const apiRoutePath = createApiRoute();
+  
+  // Step 2: Update next.config.js
+  updateNextConfig();
+  
+  console.log('\n✨ Setup complete! Your DevTools JSON endpoint will be available at:');
   console.log('   /.well-known/appspecific/com.chrome.devtools.json');
+  console.log('\n📝 What was configured:');
+  console.log('✅ API route created (no external dependencies needed)');
+  console.log('✅ Next.js config updated with plugin');
+  console.log('\n🚀 Start your Next.js development server to test the endpoint!');
 }
 
 // Run the main function since this is a CLI script

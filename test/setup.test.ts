@@ -47,7 +47,7 @@ describe('#SetupCLI', () => {
       expect(fs.existsSync(apiFile)).toBe(true);
       
       const content = await fs.promises.readFile(apiFile, 'utf-8');
-      expect(content).toContain('export default async function handler');
+      expect(content).toContain('export default function handler');
       expect(content).toContain('getOrCreateUUID');
     });
 
@@ -123,10 +123,10 @@ describe('#SetupCLI', () => {
       // Check for required imports
       expect(content).toContain('import fs from \'fs\'');
       expect(content).toContain('import path from \'path\'');
-      expect(content).toContain('import { v4, validate } from \'uuid\'');
+      expect(content).toContain('function generateUUID()');
       
       // Check for main function
-      expect(content).toContain('export default async function handler');
+      expect(content).toContain('export default function handler');
       expect(content).toContain('getOrCreateUUID');
       
       // Check for HTTP method handling
@@ -151,7 +151,7 @@ describe('#SetupCLI', () => {
       // Check for required imports
       expect(content).toContain('import fs from \'fs\'');
       expect(content).toContain('import path from \'path\'');
-      expect(content).toContain('import { v4, validate } from \'uuid\'');
+      expect(content).toContain('function generateUUID()');
       expect(content).toContain('import { NextResponse } from \'next/server\'');
       
       // Check for main function
