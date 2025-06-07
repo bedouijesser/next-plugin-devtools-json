@@ -1,0 +1,72 @@
+{
+  "name": "next-plugin-devtools-json",
+  "version": "1.0.2",
+  "description": "Next.js plugin for generating the Chrome DevTools project settings file on-the-fly in the dev server",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "next-plugin-devtools-json": "bin/setup.js",
+    "setup-devtools-json": "bin/setup.js"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "templates"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c --watch",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "prepublishOnly": "npm run build && npm test",
+    "lint": "eslint src --ext .ts,.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "nextjs",
+    "plugin",
+    "devtools",
+    "chrome",
+    "development",
+    "workspace"
+  ],
+  "author": "Your Name <your.email@example.com>",
+  "license": "MIT",
+  "peerDependencies": {
+    "next": ">=13.0.0"
+  },
+  "dependencies": {
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@rollup/plugin-typescript": "^11.1.5",
+    "@types/next": "^8.0.7",
+    "@types/node": "^20.10.0",
+    "@types/supertest": "^6.0.2",
+    "@types/uuid": "^9.0.7",
+    "eslint": "^8.55.0",
+    "next": "^14.0.0",
+    "rollup": "^4.7.0",
+    "supertest": "^6.3.3",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bedouijesser/next-plugin-devtools-json.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bedouijesser/next-plugin-devtools-json/issues"
+  },
+  "homepage": "https://github.com/bedouijesser/next-plugin-devtools-json#readme"
+}
