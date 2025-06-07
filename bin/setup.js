@@ -124,13 +124,13 @@ export async function GET() {
 function detectNextJsStructure() {
   const cwd = process.cwd();
   
-  // Check for app directory (App Router)
-  if (fs.existsSync(path.join(cwd, 'app'))) {
+  // Check for app directory (App Router) - both root and src structure
+  if (fs.existsSync(path.join(cwd, 'app')) || fs.existsSync(path.join(cwd, 'src', 'app'))) {
     return 'app';
   }
   
-  // Check for pages directory (Pages Router)
-  if (fs.existsSync(path.join(cwd, 'pages'))) {
+  // Check for pages directory (Pages Router) - both root and src structure
+  if (fs.existsSync(path.join(cwd, 'pages')) || fs.existsSync(path.join(cwd, 'src', 'pages'))) {
     return 'pages';
   }
   
@@ -146,7 +146,12 @@ function createApiRoute() {
   }
   
   if (routerType === 'pages') {
-    const apiDir = path.join(process.cwd(), 'pages', 'api');
+    // Determine if using src structure
+    const pagesDir = fs.existsSync(path.join(process.cwd(), 'src', 'pages')) 
+      ? path.join(process.cwd(), 'src', 'pages')
+      : path.join(process.cwd(), 'pages');
+    
+    const apiDir = path.join(pagesDir, 'api');
     const filePath = path.join(apiDir, 'devtools-json.js');
     
     if (!fs.existsSync(apiDir)) {
@@ -154,15 +159,20 @@ function createApiRoute() {
     }
     
     if (fs.existsSync(filePath)) {
-      console.log('⚠️  API route already exists at pages/api/devtools-json.js');
+      console.log(`⚠️  API route already exists at ${path.relative(process.cwd(), filePath)}`);
       return;
     }
     
     fs.writeFileSync(filePath, PAGES_API_TEMPLATE);
-    console.log('✅ Created API route at pages/api/devtools-json.js');
+    console.log(`✅ Created API route at ${path.relative(process.cwd(), filePath)}`);
     
   } else if (routerType === 'app') {
-    const apiDir = path.join(process.cwd(), 'app', 'api', 'devtools-json');
+    // Determine if using src structure
+    const appDir = fs.existsSync(path.join(process.cwd(), 'src', 'app'))
+      ? path.join(process.cwd(), 'src', 'app')
+      : path.join(process.cwd(), 'app');
+    
+    const apiDir = path.join(appDir, 'api', 'devtools-json');
     const filePath = path.join(apiDir, 'route.js');
     
     if (!fs.existsSync(apiDir)) {
@@ -170,12 +180,12 @@ function createApiRoute() {
     }
     
     if (fs.existsSync(filePath)) {
-      console.log('⚠️  API route already exists at app/api/devtools-json/route.js');
+      console.log(`⚠️  API route already exists at ${path.relative(process.cwd(), filePath)}`);
       return;
     }
     
     fs.writeFileSync(filePath, APP_API_TEMPLATE);
-    console.log('✅ Created API route at app/api/devtools-json/route.js');
+    console.log(`✅ Created API route at ${path.relative(process.cwd(), filePath)}`);
   }
 }
 
