@@ -28,16 +28,32 @@ function withDevToolsJSON(options: DevToolsJSONOptions = {}) {
     return {
       ...nextConfig,
       webpack(config: any, context: any) {
+        // Call original webpack function first to preserve user's configuration
+        let updatedConfig = config;
+        if (originalWebpack) {
+          updatedConfig = originalWebpack(config, context);
+        }
+
         // Set up dev server middleware if we're in dev mode
         if (context.dev && context.isServer) {
-          const originalBeforeFiles = config.devServer?.setupMiddlewares;
-          config.devServer = config.devServer || {};
+          // Safely preserve existing devServer configuration
+          const existingDevServer = updatedConfig.devServer || {};
+          const originalSetupMiddlewares = existingDevServer.setupMiddlewares;
           
-          config.devServer.setupMiddlewares = (middlewares: any, devServer: any) => {
-            if (devServer && devServer.app) {
-              const endpoint = options.endpoint || '/.well-known/appspecific/com.chrome.devtools.json';
-              
-              devServer.app.get(endpoint, (req: any, res: any) => {
+          updatedConfig.devServer = {
+            ...existingDevServer,
+            setupMiddlewares: (middlewares: any, devServer: any) => {
+              // Call original setupMiddlewares first if it exists
+              let updatedMiddlewares = middlewares;
+              if (originalSetupMiddlewares) {
+                updatedMiddlewares = originalSetupMiddlewares(middlewares, devServer);
+              }
+
+              // Add our middleware
+              if (devServer && devServer.app) {
+                const endpoint = options.endpoint || '/.well-known/appspecific/com.chrome.devtools.json';
+                
+                devServer.app.get(endpoint, (req: any, res: any) => {
                 try {
                   const projectRoot = process.cwd();
                   
@@ -95,20 +111,14 @@ function withDevToolsJSON(options: DevToolsJSONOptions = {}) {
                   res.status(500).json({});
                 }
               });
-            }
+              }
 
-            if (originalBeforeFiles) {
-              return originalBeforeFiles(middlewares, devServer);
+              return updatedMiddlewares;
             }
-            return middlewares;
           };
         }
 
-        if (originalWebpack) {
-          return originalWebpack(config, context);
-        }
-
-        return config;
+        return updatedConfig;
       },
     };
   };

@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { createServer } from 'http';
-import { describe, expect, it, beforeAll, afterAll } from 'vitest';
+import { describe, expect, it, beforeAll, afterAll, vi } from 'vitest';
 import withDevToolsJSON from '../dist/index.mjs';
 
 // Mock Next.js config and server setup
@@ -96,6 +96,51 @@ describe('#NextPluginDevToolsJSON', () => {
         
         expect(originalWebpack).toHaveBeenCalledWith(expect.any(Object), mockContext);
         expect(updatedConfig.custom).toBe(true);
+      } finally {
+        // Restore original environment
+        process.env.NODE_ENV = originalEnv;
+      }
+    });
+    
+    it('should preserve existing devServer configuration', () => {
+      // Set environment to development for this test
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      
+      try {
+        const originalSetupMiddlewares = vi.fn((middlewares) => [...middlewares, 'custom-middleware']);
+        const nextConfig = {
+          webpack: (config) => ({
+            ...config,
+            devServer: {
+              port: 3001,
+              setupMiddlewares: originalSetupMiddlewares,
+              customOption: true
+            }
+          })
+        };
+        
+        const configWithPlugin = withDevToolsJSON()(nextConfig);
+        
+        const mockConfig = { devServer: {} };
+        const mockContext = { dev: true, isServer: true };
+        
+        const updatedConfig = configWithPlugin.webpack(mockConfig, mockContext);
+        
+        // Should preserve existing devServer properties
+        expect(updatedConfig.devServer.port).toBe(3001);
+        expect(updatedConfig.devServer.customOption).toBe(true);
+        expect(typeof updatedConfig.devServer.setupMiddlewares).toBe('function');
+        
+        // Test that the original setupMiddlewares is called
+        const mockMiddlewares = ['existing-middleware'];
+        const mockDevServer = { app: { get: vi.fn() } };
+        
+        const result = updatedConfig.devServer.setupMiddlewares(mockMiddlewares, mockDevServer);
+        
+        expect(originalSetupMiddlewares).toHaveBeenCalledWith(mockMiddlewares, mockDevServer);
+        expect(result).toContain('custom-middleware');
+        expect(mockDevServer.app.get).toHaveBeenCalled();
       } finally {
         // Restore original environment
         process.env.NODE_ENV = originalEnv;
