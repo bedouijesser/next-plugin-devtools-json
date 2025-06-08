@@ -21,7 +21,17 @@ Or manually add to `next.config.js`:
 ```javascript
 const withDevToolsJSON = require('next-plugin-devtools-json');
 
-module.exports = withDevToolsJSON()({
+module.exports = withDevToolsJSON({
+  // your config
+});
+```
+
+Or `next.config.mjs`:
+
+```javascript
+import withDevToolsJSON from 'next-plugin-devtools-json';
+
+export default withDevToolsJSON({
   // your config
 });
 ```
