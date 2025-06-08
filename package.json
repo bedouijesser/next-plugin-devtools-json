@@ -1,7 +1,7 @@
 {
   "name": "next-plugin-devtools-json",
-  "version": "3.1.0",
-  "description": "Next.js plugin for serving Chrome DevTools project settings via webpack middleware - no API routes needed",
+  "version": "3.1.2",
+  "description": "Next.js plugin for Chrome DevTools project settings - seamless development integration with rewrites and standalone server",
   "type": "module",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
@@ -27,6 +27,9 @@
     "dev": "rollup -c --watch",
     "test": "vitest run",
     "test:watch": "vitest --watch",
+    "test:compatibility": "node scripts/test-compatibility.mjs",
+    "test:quick": "node scripts/quick-test.mjs",
+    "test:all": "npm test && npm run test:quick",
     "prepublishOnly": "npm run build && vitest run",
     "lint": "eslint src --ext .ts,.js",
     "typecheck": "tsc --noEmit"
@@ -39,7 +42,7 @@
     "development",
     "workspace"
   ],
-  "author": "Your Name <your.email@example.com>",
+  "author": "Jesser Bedoui <bedouijesser@gmail.com>",
   "license": "MIT",
   "peerDependencies": {
     "next": ">=13.0.0"

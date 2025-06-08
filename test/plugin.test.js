@@ -5,7 +5,7 @@ import withDevToolsJSON from '../dist/index.mjs';
 
 // Mock Next.js config and server setup
 function createTestServer(nextConfig = {}) {
-  const configWithPlugin = withDevToolsJSON()(nextConfig);
+  const configWithPlugin = withDevToolsJSON(nextConfig);
   
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
@@ -62,85 +62,89 @@ describe('#NextPluginDevToolsJSON', () => {
       server.close();
     });
     
-    it('should configure webpack middleware properly', () => {
+    it('should configure rewrites properly', async () => {
       // Set environment to development for this test
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'development';
       
       try {
         const nextConfig = {};
-        const configWithPlugin = withDevToolsJSON()(nextConfig);
+        const configWithPlugin = withDevToolsJSON(nextConfig);
         
-        expect(configWithPlugin).toHaveProperty('webpack');
-        expect(typeof configWithPlugin.webpack).toBe('function');
+        expect(configWithPlugin).toHaveProperty('rewrites');
+        expect(typeof configWithPlugin.rewrites).toBe('function');
+        
+        const rewrites = await configWithPlugin.rewrites();
+        expect(Array.isArray(rewrites)).toBe(true);
+        expect(rewrites.length).toBeGreaterThan(0);
+        expect(rewrites[0]).toHaveProperty('source', '/__devtools_json');
+        expect(rewrites[0]).toHaveProperty('destination');
+        expect(rewrites[0].destination).toContain('localhost:3001');
       } finally {
         // Restore original environment
         process.env.NODE_ENV = originalEnv;
       }
     });
     
-    it('should preserve existing webpack configuration', () => {
+    it('should preserve other Next.js configuration', () => {
       // Set environment to development for this test
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'development';
       
       try {
-        const originalWebpack = vi.fn((config) => ({ ...config, custom: true }));
-        const nextConfig = { webpack: originalWebpack };
-        const configWithPlugin = withDevToolsJSON()(nextConfig);
+        const nextConfig = { 
+          distDir: '.next',
+          experimental: { appDir: true },
+          customProperty: 'custom-value'
+        };
+        const configWithPlugin = withDevToolsJSON(nextConfig);
         
-        const mockConfig = { devServer: {} };
-        const mockContext = { dev: true, isServer: true };
+        // Should preserve all other properties
+        expect(configWithPlugin.distDir).toBe('.next');
+        expect(configWithPlugin.experimental).toEqual({ appDir: true });
+        expect(configWithPlugin.customProperty).toBe('custom-value');
         
-        const updatedConfig = configWithPlugin.webpack(mockConfig, mockContext);
-        
-        expect(originalWebpack).toHaveBeenCalledWith(expect.any(Object), mockContext);
-        expect(updatedConfig.custom).toBe(true);
+        // Should only add rewrites
+        expect(configWithPlugin).toHaveProperty('rewrites');
       } finally {
         // Restore original environment
         process.env.NODE_ENV = originalEnv;
       }
     });
     
-    it('should preserve existing devServer configuration', () => {
+    it('should preserve existing rewrites configuration', async () => {
       // Set environment to development for this test
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'development';
       
       try {
-        const originalSetupMiddlewares = vi.fn((middlewares) => [...middlewares, 'custom-middleware']);
+        const existingRewrites = [
+          { source: '/custom', destination: '/custom-page' }
+        ];
+        
         const nextConfig = {
-          webpack: (config) => ({
-            ...config,
-            devServer: {
-              port: 3001,
-              setupMiddlewares: originalSetupMiddlewares,
-              customOption: true
-            }
-          })
+          rewrites: async () => existingRewrites
         };
         
-        const configWithPlugin = withDevToolsJSON()(nextConfig);
+        const configWithPlugin = withDevToolsJSON(nextConfig);
         
-        const mockConfig = { devServer: {} };
-        const mockContext = { dev: true, isServer: true };
+        // Should preserve existing rewrites configuration
+        expect(configWithPlugin).toHaveProperty('rewrites');
+        expect(typeof configWithPlugin.rewrites).toBe('function');
         
-        const updatedConfig = configWithPlugin.webpack(mockConfig, mockContext);
+        const rewrites = await configWithPlugin.rewrites();
         
-        // Should preserve existing devServer properties
-        expect(updatedConfig.devServer.port).toBe(3001);
-        expect(updatedConfig.devServer.customOption).toBe(true);
-        expect(typeof updatedConfig.devServer.setupMiddlewares).toBe('function');
+        // Should have both the DevTools rewrite and the existing ones
+        expect(Array.isArray(rewrites)).toBe(true);
+        expect(rewrites.length).toBe(2);
         
-        // Test that the original setupMiddlewares is called
-        const mockMiddlewares = ['existing-middleware'];
-        const mockDevServer = { app: { get: vi.fn() } };
+        // DevTools rewrite should be first
+        expect(rewrites[0]).toHaveProperty('source', '/__devtools_json');
+        expect(rewrites[0]).toHaveProperty('destination');
+        expect(rewrites[0].destination).toContain('localhost:3001');
         
-        const result = updatedConfig.devServer.setupMiddlewares(mockMiddlewares, mockDevServer);
-        
-        expect(originalSetupMiddlewares).toHaveBeenCalledWith(mockMiddlewares, mockDevServer);
-        expect(result).toContain('custom-middleware');
-        expect(mockDevServer.app.get).toHaveBeenCalled();
+        // Existing rewrite should be preserved
+        expect(rewrites[1]).toEqual(existingRewrites[0]);
       } finally {
         // Restore original environment
         process.env.NODE_ENV = originalEnv;
@@ -154,7 +158,7 @@ describe('#NextPluginDevToolsJSON', () => {
       };
       
       const nextConfig = {};
-      const configWithPlugin = withDevToolsJSON(options)(nextConfig);
+      const configWithPlugin = withDevToolsJSON(nextConfig, options);
       
       // With enabled: false, should return original config
       expect(configWithPlugin).toEqual(nextConfig);

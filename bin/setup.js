@@ -2,6 +2,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 
 function detectNextConfigFile() {
   const configFiles = [
@@ -39,16 +40,13 @@ function detectConfigFormat(filePath) {
 
 function createNextConfig(format) {
   const pluginImport = format === 'commonjs' 
-    ? "const withDevToolsJSON = require('next-plugin-devtools-json');"
+    ? `const plugin = require('next-plugin-devtools-json');
+const withDevToolsJSON = plugin.default || plugin;`
     : "import withDevToolsJSON from 'next-plugin-devtools-json';";
 
   const exportStatement = format === 'commonjs'
-    ? `module.exports = process.env.NODE_ENV === 'development' 
-  ? withDevToolsJSON(nextConfig)
-  : nextConfig;`
-    : `export default process.env.NODE_ENV === 'development'
-  ? withDevToolsJSON(nextConfig)
-  : nextConfig;`;
+    ? `module.exports = withDevToolsJSON(nextConfig);`
+    : `export default withDevToolsJSON(nextConfig);`;
 
   const typeAnnotation = format === 'typescript' ? ': import(\'next\').NextConfig' : '';
 
@@ -64,7 +62,7 @@ ${exportStatement}`;
 
 function updateExistingConfig(filePath, content, format) {
   const pluginImport = format === 'commonjs' 
-    ? "const withDevToolsJSON = require('next-plugin-devtools-json');"
+    ? "const { default: withDevToolsJSON } = require('next-plugin-devtools-json');"
     : "import withDevToolsJSON from 'next-plugin-devtools-json';";
 
   let updatedContent = content;
@@ -96,9 +94,7 @@ function updateExistingConfig(filePath, content, format) {
     if (content.includes('module.exports = ')) {
       updatedContent = updatedContent.replace(
         /module\.exports\s*=\s*([^;]+);?/,
-        `module.exports = process.env.NODE_ENV === 'development' 
-  ? withDevToolsJSON($1)
-  : $1;`
+        `module.exports = withDevToolsJSON($1);`
       );
     }
   } else {
@@ -106,9 +102,7 @@ function updateExistingConfig(filePath, content, format) {
     if (content.includes('export default ')) {
       updatedContent = updatedContent.replace(
         /export\s+default\s+([^;]+);?/,
-        `export default process.env.NODE_ENV === 'development'
-  ? withDevToolsJSON($1)
-  : $1;`
+        `export default withDevToolsJSON($1);`
       );
     }
   }
@@ -129,6 +123,21 @@ function main() {
   if (!packageJson.dependencies?.next && !packageJson.devDependencies?.next) {
     console.error('❌ Error: Next.js not found in dependencies. Please run this command in a Next.js project.');
     process.exit(1);
+  }
+
+  // Check if package is already installed
+  const isAlreadyInstalled = packageJson.devDependencies?.['next-plugin-devtools-json'] || 
+                             packageJson.dependencies?.['next-plugin-devtools-json'];
+  
+  if (!isAlreadyInstalled) {
+    console.log('📦 Installing next-plugin-devtools-json as dev dependency...');
+    try {
+      execSync('npm install --save-dev next-plugin-devtools-json', { stdio: 'inherit' });
+      console.log('✅ Package installed successfully!');
+    } catch (error) {
+      console.error('❌ Failed to install package:', error.message);
+      process.exit(1);
+    }
   }
 
   try {

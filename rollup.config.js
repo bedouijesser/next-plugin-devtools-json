@@ -25,12 +25,26 @@ export default [
       file: 'dist/index.cjs',
       format: 'cjs',
       sourcemap: true,
-      exports: 'named'
+      exports: 'named' // Export as named for proper CommonJS compatibility
     },
     plugins: [
       typescript({
-        declaration: false
-      })
+        declaration: false,
+        declarationMap: false
+      }),
+      // Custom plugin to fix CommonJS export for better compatibility
+      {
+        name: 'fix-cjs-export',
+        generateBundle(options, bundle) {
+          for (const fileName in bundle) {
+            const chunk = bundle[fileName];
+            if (chunk.type === 'chunk' && fileName.endsWith('.cjs')) {
+              // Add compatibility export at the end
+              chunk.code += '\n\n// CommonJS compatibility\nmodule.exports = withDevToolsJSON;\nmodule.exports.default = withDevToolsJSON;\nmodule.exports.withDevToolsJSON = withDevToolsJSON;\n';
+            }
+          }
+        }
+      }
     ],
     external: ['next', 'webpack', 'fs', 'path']
   }
