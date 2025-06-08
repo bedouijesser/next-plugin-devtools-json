@@ -58,7 +58,9 @@ describe('#SetupCLI', () => {
       const content = await fs.promises.readFile(configFile, 'utf-8');
       expect(content).toContain('next-plugin-devtools-json');
       expect(content).toContain('withDevToolsJSON');
-      expect(content).toContain('module.exports = withDevToolsJSON(nextConfig)');
+      expect(content).toContain('process.env.NODE_ENV === \'development\'');
+      expect(content).toContain('withDevToolsJSON(nextConfig)');
+      expect(content).toContain(': nextConfig');
     });
 
     it('should update existing CommonJS next.config.js', async () => {
@@ -99,7 +101,9 @@ module.exports = nextConfig;`;
       
       expect(content).toContain('next-plugin-devtools-json');
       expect(content).toContain('withDevToolsJSON');
-      expect(content).toContain('module.exports = withDevToolsJSON(nextConfig)');
+      expect(content).toContain('process.env.NODE_ENV === \'development\'');
+      expect(content).toContain('withDevToolsJSON(nextConfig)');
+      expect(content).toContain(': nextConfig');
       expect(content).toContain('reactStrictMode: true'); // Preserve existing config
     });
 
@@ -141,7 +145,9 @@ export default nextConfig;`;
       
       expect(content).toContain('next-plugin-devtools-json');
       expect(content).toContain('withDevToolsJSON');
-      expect(content).toContain('export default withDevToolsJSON(nextConfig)');
+      expect(content).toContain('process.env.NODE_ENV === \'development\'');
+      expect(content).toContain('withDevToolsJSON(nextConfig)');
+      expect(content).toContain(': nextConfig');
       expect(content).toContain('reactStrictMode: true'); // Preserve existing config
     });
 
@@ -185,7 +191,9 @@ export default nextConfig;`;
       
       expect(content).toContain('next-plugin-devtools-json');
       expect(content).toContain('withDevToolsJSON');
-      expect(content).toContain('export default withDevToolsJSON(nextConfig)');
+      expect(content).toContain('process.env.NODE_ENV === \'development\'');
+      expect(content).toContain('withDevToolsJSON(nextConfig)');
+      expect(content).toContain(': nextConfig');
       expect(content).toContain('reactStrictMode: true'); // Preserve existing config
     });
 

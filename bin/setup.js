@@ -43,8 +43,12 @@ function createNextConfig(format) {
     : "import withDevToolsJSON from 'next-plugin-devtools-json';";
 
   const exportStatement = format === 'commonjs'
-    ? 'module.exports = withDevToolsJSON(nextConfig);'
-    : 'export default withDevToolsJSON(nextConfig);';
+    ? `module.exports = process.env.NODE_ENV === 'development' 
+  ? withDevToolsJSON(nextConfig)
+  : nextConfig;`
+    : `export default process.env.NODE_ENV === 'development'
+  ? withDevToolsJSON(nextConfig)
+  : nextConfig;`;
 
   const typeAnnotation = format === 'typescript' ? ': import(\'next\').NextConfig' : '';
 
@@ -92,7 +96,9 @@ function updateExistingConfig(filePath, content, format) {
     if (content.includes('module.exports = ')) {
       updatedContent = updatedContent.replace(
         /module\.exports\s*=\s*([^;]+);?/,
-        'module.exports = withDevToolsJSON($1);'
+        `module.exports = process.env.NODE_ENV === 'development' 
+  ? withDevToolsJSON($1)
+  : $1;`
       );
     }
   } else {
@@ -100,7 +106,9 @@ function updateExistingConfig(filePath, content, format) {
     if (content.includes('export default ')) {
       updatedContent = updatedContent.replace(
         /export\s+default\s+([^;]+);?/,
-        'export default withDevToolsJSON($1);'
+        `export default process.env.NODE_ENV === 'development'
+  ? withDevToolsJSON($1)
+  : $1;`
       );
     }
   }
@@ -151,7 +159,7 @@ function main() {
     console.log('   /.well-known/appspecific/com.chrome.devtools.json');
     console.log('\n🚀 Start your development server with: npm run dev');
     console.log('\n💡 The endpoint is only available in development mode for security.');
-    console.log('\n📚 For more information, visit: https://github.com/your-username/next-plugin-devtools-json');
+    console.log('\n📚 For more information, visit: https://github.com/bedouijesser/next-plugin-devtools-json');
 
   } catch (error) {
     console.error('❌ Setup failed:', error.message);
