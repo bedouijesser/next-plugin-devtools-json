@@ -62,53 +62,44 @@ describe('#NextPluginDevToolsJSON', () => {
       server.close();
     });
     
-    it('should configure rewrites properly', async () => {
-      const nextConfig = {};
-      const configWithPlugin = withDevToolsJSON()(nextConfig);
+    it('should configure webpack middleware properly', () => {
+      // Set environment to development for this test
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
       
-      expect(configWithPlugin).toHaveProperty('rewrites');
-      expect(typeof configWithPlugin.rewrites).toBe('function');
-      
-      const rewrites = await configWithPlugin.rewrites();
-      
-      expect(rewrites).toHaveProperty('beforeFiles');
-      expect(Array.isArray(rewrites.beforeFiles)).toBe(true);
-      expect(rewrites.beforeFiles.length).toBeGreaterThan(0);
-      
-      const devtoolsRewrite = rewrites.beforeFiles.find(
-        (rewrite) => rewrite.source === '/.well-known/appspecific/com.chrome.devtools.json'
-      );
-      
-      expect(devtoolsRewrite).toBeDefined();
-      expect(devtoolsRewrite.destination).toBe('/api/devtools-json');
+      try {
+        const nextConfig = {};
+        const configWithPlugin = withDevToolsJSON()(nextConfig);
+        
+        expect(configWithPlugin).toHaveProperty('webpack');
+        expect(typeof configWithPlugin.webpack).toBe('function');
+      } finally {
+        // Restore original environment
+        process.env.NODE_ENV = originalEnv;
+      }
     });
     
-    it('should preserve existing rewrites', async () => {
-      const existingRewrites = async () => ({
-        beforeFiles: [{ source: '/existing', destination: '/api/existing' }],
-        afterFiles: [{ source: '/after', destination: '/api/after' }],
-        fallback: [{ source: '/fallback', destination: '/api/fallback' }],
-      });
+    it('should preserve existing webpack configuration', () => {
+      // Set environment to development for this test
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
       
-      const nextConfig = { rewrites: existingRewrites };
-      const configWithPlugin = withDevToolsJSON()(nextConfig);
-      
-      const rewrites = await configWithPlugin.rewrites();
-      
-      expect(rewrites.beforeFiles.length).toBe(2); // existing + devtools
-      expect(rewrites.afterFiles.length).toBe(1);
-      expect(rewrites.fallback.length).toBe(1);
-      
-      const devtoolsRewrite = rewrites.beforeFiles.find(
-        (rewrite) => rewrite.source === '/.well-known/appspecific/com.chrome.devtools.json'
-      );
-      
-      const existingRewrite = rewrites.beforeFiles.find(
-        (rewrite) => rewrite.source === '/existing'
-      );
-      
-      expect(devtoolsRewrite).toBeDefined();
-      expect(existingRewrite).toBeDefined();
+      try {
+        const originalWebpack = vi.fn((config) => ({ ...config, custom: true }));
+        const nextConfig = { webpack: originalWebpack };
+        const configWithPlugin = withDevToolsJSON()(nextConfig);
+        
+        const mockConfig = { devServer: {} };
+        const mockContext = { dev: true, isServer: true };
+        
+        const updatedConfig = configWithPlugin.webpack(mockConfig, mockContext);
+        
+        expect(originalWebpack).toHaveBeenCalledWith(expect.any(Object), mockContext);
+        expect(updatedConfig.custom).toBe(true);
+      } finally {
+        // Restore original environment
+        process.env.NODE_ENV = originalEnv;
+      }
     });
     
     it('should support custom options', () => {
@@ -120,9 +111,8 @@ describe('#NextPluginDevToolsJSON', () => {
       const nextConfig = {};
       const configWithPlugin = withDevToolsJSON(options)(nextConfig);
       
-      // Plugin should still add rewrites regardless of options
-      // (The enabled option would be handled by the API route)
-      expect(configWithPlugin).toHaveProperty('rewrites');
+      // With enabled: false, should return original config
+      expect(configWithPlugin).toEqual(nextConfig);
     });
   });
 });

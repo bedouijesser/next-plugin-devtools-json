@@ -1,7 +1,7 @@
 {
   "name": "next-plugin-devtools-json",
-  "version": "2.0.0",
-  "description": "Next.js plugin for generating the Chrome DevTools project settings file on-the-fly in the dev server",
+  "version": "3.0.0",
+  "description": "Next.js plugin for serving Chrome DevTools project settings via webpack middleware - no API routes needed",
   "type": "module",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
@@ -20,8 +20,7 @@
   },
   "files": [
     "dist",
-    "bin",
-    "templates"
+    "bin"
   ],
   "scripts": {
     "build": "rollup -c",
@@ -45,15 +44,11 @@
   "peerDependencies": {
     "next": ">=13.0.0"
   },
-  "dependencies": {
-    "uuid": "^9.0.1"
-  },
   "devDependencies": {
     "@rollup/plugin-typescript": "^11.1.5",
     "@types/next": "^8.0.7",
     "@types/node": "^20.10.0",
     "@types/supertest": "^6.0.2",
-    "@types/uuid": "^9.0.7",
     "eslint": "^8.55.0",
     "next": "^14.0.0",
     "rollup": "^4.7.0",

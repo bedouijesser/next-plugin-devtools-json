@@ -16,7 +16,7 @@ export default [
         rootDir: 'src'
       })
     ],
-    external: ['uuid', 'next']
+    external: ['next', 'webpack', 'fs', 'path']
   },
   // CJS build
   {
@@ -32,6 +32,6 @@ export default [
         declaration: false
       })
     ],
-    external: ['uuid', 'next']
+    external: ['next', 'webpack', 'fs', 'path']
   }
 ]

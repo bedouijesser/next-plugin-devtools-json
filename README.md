@@ -1,15 +1,16 @@
 # next-plugin-devtools-json
 
-A Next.js plugin that provides a plug-and-play solution for serving a Chrome DevTools project settings JSON endpoint at `/.well-known/appspecific/com.chrome.devtools.json`. This plugin enables seamless integration between Chrome DevTools and your Next.js project workspace.
+A Next.js plugin that provides a plug-and-play solution for serving a Chrome DevTools project settings JSON endpoint at `/.well-known/appspecific/com.chrome.devtools.json`. This plugin uses webpack middleware to serve the endpoint dynamically **without requiring any API route files**.
 
 ## ✨ Features
 
 - 🔌 **One-command setup** - Automatic configuration with `npx`
 - 🔧 **Auto-config** - Automatically updates your `next.config.js`
 - 🔄 **Automatic UUID management** - Generates and persists project UUIDs
-- 🏗️ **Multi-router support** - Works with both App Router and Pages Router
-- 📁 **Flexible structure** - Supports both root and `src/` directory structures
+- ⚡ **No API routes needed** - Uses webpack middleware for cleaner integration
 - 🚫 **No external dependencies** - UUID generation built-in
+- 💻 **Dev-only serving** - Endpoint only available in development mode
+- 🏗️ **Universal compatibility** - Works with any Next.js project structure
 - ⚡ **Zero configuration** - Works out of the box with sensible defaults
 
 ## 🚀 Quick Start
@@ -21,10 +22,9 @@ npx next-plugin-devtools-json
 ```
 
 **That's it!** This single command will:
-- ✅ Detect your Next.js structure (App Router/Pages Router, root/src)
-- ✅ Create the appropriate API route file (no external dependencies)
 - ✅ Automatically add the plugin to your `next.config.js` (or create one)
-- ✅ Configure everything for you
+- ✅ Configure webpack middleware to serve the DevTools JSON endpoint
+- ✅ No physical API route files needed - everything is handled in memory
 
 Start your Next.js development server and the endpoint will be available at:
 ```
@@ -49,22 +49,20 @@ const nextConfig = {
   // your existing config
 };
 
-module.exports = withDevToolsJSON()(nextConfig);
+module.exports = withDevToolsJSON(nextConfig);
 ```
 
-And create the API route:
-```bash
-npx next-plugin-devtools-json
-```
+**No API routes needed!** The plugin handles everything through webpack middleware.
 
 ## 📖 How It Works
 
-The plugin:
+The plugin uses **webpack development middleware** to serve the DevTools JSON endpoint:
 
-1. **Creates an API route** that generates the DevTools JSON response
-2. **Adds a rewrite rule** to map `/.well-known/appspecific/com.chrome.devtools.json` to your API route
+1. **Hooks into webpack dev server** during development
+2. **Serves the endpoint directly** via middleware (no physical API files)
 3. **Manages UUIDs** automatically in `.next/cache/devtools-uuid.json`
-4. **No external dependencies** - uses built-in UUID generation
+4. **Zero overhead** - only active in development mode
+5. **No external dependencies** - uses built-in UUID generation
 
 ## 🔧 Configuration
 
@@ -73,7 +71,7 @@ The plugin:
 ```javascript
 const withDevToolsJSON = require('next-plugin-devtools-json');
 
-module.exports = withDevToolsJSON()(nextConfig);
+module.exports = withDevToolsJSON(nextConfig);
 ```
 
 ### With options
@@ -83,7 +81,8 @@ const withDevToolsJSON = require('next-plugin-devtools-json');
 
 module.exports = withDevToolsJSON({
   uuid: 'your-custom-uuid', // Optional: provide a custom UUID
-  enabled: process.env.NODE_ENV === 'development', // Optional: only enable in development
+  enabled: process.env.NODE_ENV === 'development', // Optional: control when enabled
+  endpoint: '/.well-known/appspecific/com.chrome.devtools.json' // Optional: custom endpoint
 })(nextConfig);
 ```
 
@@ -97,40 +96,23 @@ const nextConfig = {
   // your config
 };
 
-export default withDevToolsJSON()(nextConfig);
+export default withDevToolsJSON(nextConfig);
 ```
 
-## 📁 Supported Project Structures
+## 📁 Universal Project Support
 
-The plugin automatically detects and supports all common Next.js structures:
+The new webpack-based approach works with **any Next.js project structure** automatically:
 
-### App Router
-```
-your-project/
-├── app/api/devtools-json/route.js    # Auto-created
-└── next.config.js                    # Auto-updated
-```
+- ✅ App Router
+- ✅ Pages Router  
+- ✅ Root directory layout
+- ✅ `src/` directory layout
+- ✅ TypeScript projects
+- ✅ JavaScript projects
+- ✅ CommonJS configs
+- ✅ ESM configs
 
-### App Router with src/
-```
-your-project/
-├── src/app/api/devtools-json/route.js # Auto-created
-└── next.config.js                     # Auto-updated
-```
-
-### Pages Router
-```
-your-project/
-├── pages/api/devtools-json.js         # Auto-created
-└── next.config.js                     # Auto-updated
-```
-
-### Pages Router with src/
-```
-your-project/
-├── src/pages/api/devtools-json.js     # Auto-created
-└── next.config.js                     # Auto-updated
-```
+**No file structure detection needed** - everything works through webpack middleware!
 
 ## 🔍 API Response
 
@@ -358,7 +340,7 @@ module.exports = withDevToolsJSON({
 
 ## Available Commands
 
-The package provides multiple ways to set up the API route:
+The package provides multiple ways to set up the webpack middleware:
 
 ### npx next-plugin-devtools-json@latest (Recommended)
 ```bash
@@ -378,17 +360,16 @@ npx setup-devtools-json
 - ✅ Same functionality as above
 
 Both commands will:
-- Detect your project structure (App Router vs Pages Router)
-- Handle both root directory and `src/` directory layouts
-- Create the appropriate API route file
-- Show clear next steps for configuration
+- Detect and update your `next.config.js` (or create one)
+- Configure webpack middleware automatically
+- No physical files created - everything works in memory
 
 ## Troubleshooting
 
 ### The endpoint returns 404
 
 1. Make sure you've added the plugin to your `next.config.js`
-2. Ensure you've created the API route file in the correct location
+2. Ensure you're in development mode (`NODE_ENV=development`)
 3. Restart your Next.js development server after making configuration changes
 
 ### UUID keeps changing

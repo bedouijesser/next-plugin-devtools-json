@@ -1,41 +1,96 @@
-const ENDPOINT = '/.well-known/appspecific/com.chrome.devtools.json';
-
 function withDevToolsJSON(options = {}) {
   return (nextConfig = {}) => {
-    const originalRewrites = nextConfig.rewrites;
+    // Only enable in development mode
+    if (process.env.NODE_ENV !== 'development' || options.enabled === false) {
+      return nextConfig;
+    }
+
+    const originalWebpack = nextConfig.webpack;
 
     return {
       ...nextConfig,
-      async rewrites() {
-        const rewrites = [
-          {
-            source: ENDPOINT,
-            destination: '/api/devtools-json',
-          },
-        ];
+      webpack(config, context) {
+        // Set up dev server middleware if we're in dev mode
+        if (context.dev && context.isServer) {
+          const originalBeforeFiles = config.devServer?.setupMiddlewares;
+          config.devServer = config.devServer || {};
+          
+          config.devServer.setupMiddlewares = (middlewares, devServer) => {
+            if (devServer && devServer.app) {
+              const endpoint = options.endpoint || '/.well-known/appspecific/com.chrome.devtools.json';
+              
+              devServer.app.get(endpoint, (req, res) => {
+                try {
+                  const projectRoot = process.cwd();
+                  
+                  // Simple UUID generation function
+                  function generateUUID() {
+                    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                      const r = Math.random() * 16 | 0;
+                      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                      return v.toString(16);
+                    });
+                  }
 
-        if (typeof originalRewrites === 'function') {
-          const originalResult = await originalRewrites();
-          if (originalResult && typeof originalResult === 'object') {
-            return {
-              beforeFiles: [...(originalResult.beforeFiles || []), ...rewrites],
-              afterFiles: originalResult.afterFiles || [],
-              fallback: originalResult.fallback || [],
-            };
-          }
-        } else if (originalRewrites && typeof originalRewrites === 'object') {
-          return {
-            beforeFiles: [...(originalRewrites.beforeFiles || []), ...rewrites],
-            afterFiles: originalRewrites.afterFiles || [],
-            fallback: originalRewrites.fallback || [],
+                  function getOrCreateUUID(projectRoot) {
+                    const path = require('path');
+                    const fs = require('fs');
+                    
+                    const cacheDir = path.resolve(projectRoot, '.next', 'cache');
+                    const uuidPath = path.resolve(cacheDir, 'devtools-uuid.json');
+
+                    if (fs.existsSync(uuidPath)) {
+                      try {
+                        const uuidContent = fs.readFileSync(uuidPath, { encoding: 'utf-8' });
+                        const uuid = uuidContent.trim();
+                        if (uuid.length === 36 && uuid.split('-').length === 5) {
+                          return uuid;
+                        }
+                      } catch (error) {
+                        console.warn('Failed to read existing UUID, generating new one:', error);
+                      }
+                    }
+
+                    if (!fs.existsSync(cacheDir)) {
+                      fs.mkdirSync(cacheDir, { recursive: true });
+                    }
+
+                    const uuid = generateUUID();
+                    fs.writeFileSync(uuidPath, uuid, { encoding: 'utf-8' });
+                    console.log(`Generated UUID '${uuid}' for DevTools project settings.`);
+                    return uuid;
+                  }
+
+                  const uuid = options.uuid || getOrCreateUUID(projectRoot);
+
+                  const devtoolsJson = {
+                    workspace: {
+                      root: projectRoot,
+                      uuid,
+                    },
+                  };
+
+                  res.setHeader('Content-Type', 'application/json');
+                  res.status(200).json(devtoolsJson);
+                } catch (error) {
+                  console.error('Error generating DevTools JSON:', error);
+                  res.status(500).json({});
+                }
+              });
+            }
+
+            if (originalBeforeFiles) {
+              return originalBeforeFiles(middlewares, devServer);
+            }
+            return middlewares;
           };
         }
 
-        return {
-          beforeFiles: rewrites,
-          afterFiles: [],
-          fallback: [],
-        };
+        if (originalWebpack) {
+          return originalWebpack(config, context);
+        }
+
+        return config;
       },
     };
   };

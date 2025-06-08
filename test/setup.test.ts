@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -31,135 +31,269 @@ describe('#SetupCLI', () => {
     }
   });
 
-  describe('#detectNextJsStructure', () => {
-    it('should detect Pages Router structure', async () => {
-      const pagesDir = path.join(testProjectRoot, 'pages');
-      await fs.promises.mkdir(pagesDir, { recursive: true });
-      
-      // Mock the setup script execution in the test directory
+  describe('#nextConfigSetup', () => {
+    it('should create new next.config.js when none exists', async () => {
+      // Create a basic package.json with Next.js dependency
+      const packageJson = {
+        name: 'test-project',
+        version: '1.0.0',
+        dependencies: {
+          next: '^14.0.0'
+        }
+      };
+      await fs.promises.writeFile(
+        path.join(testProjectRoot, 'package.json'),
+        JSON.stringify(packageJson, null, 2)
+      );
+
       const { stdout } = await execAsync(`cd "${testProjectRoot}" && node "${setupScript}"`, {
         env: { ...process.env, NODE_ENV: 'test' }
       });
       
-      expect(stdout).toContain('pages/api/devtools-json.js');
+      expect(stdout).toContain('Created next.config.js');
       
-      const apiFile = path.join(testProjectRoot, 'pages', 'api', 'devtools-json.js');
-      expect(fs.existsSync(apiFile)).toBe(true);
+      const configFile = path.join(testProjectRoot, 'next.config.js');
+      expect(fs.existsSync(configFile)).toBe(true);
       
-      const content = await fs.promises.readFile(apiFile, 'utf-8');
-      expect(content).toContain('export default function handler');
-      expect(content).toContain('getOrCreateUUID');
+      const content = await fs.promises.readFile(configFile, 'utf-8');
+      expect(content).toContain('next-plugin-devtools-json');
+      expect(content).toContain('withDevToolsJSON');
+      expect(content).toContain('module.exports = withDevToolsJSON(nextConfig)');
     });
 
-    it('should detect App Router structure', async () => {
-      const appDir = path.join(testProjectRoot, 'app');
-      await fs.promises.mkdir(appDir, { recursive: true });
+    it('should update existing CommonJS next.config.js', async () => {
+      // Create a basic package.json with Next.js dependency
+      const packageJson = {
+        name: 'test-project',
+        version: '1.0.0',
+        dependencies: {
+          next: '^14.0.0'
+        }
+      };
+      await fs.promises.writeFile(
+        path.join(testProjectRoot, 'package.json'),
+        JSON.stringify(packageJson, null, 2)
+      );
+
+      // Create an existing next.config.js
+      const existingConfig = `/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true
+};
+
+module.exports = nextConfig;`;
       
+      await fs.promises.writeFile(
+        path.join(testProjectRoot, 'next.config.js'),
+        existingConfig
+      );
+
       const { stdout } = await execAsync(`cd "${testProjectRoot}" && node "${setupScript}"`, {
         env: { ...process.env, NODE_ENV: 'test' }
       });
       
-      expect(stdout).toContain('app/api/devtools-json/route.js');
+      expect(stdout).toContain('Updated next.config file');
       
-      const apiFile = path.join(testProjectRoot, 'app', 'api', 'devtools-json', 'route.js');
-      expect(fs.existsSync(apiFile)).toBe(true);
+      const configFile = path.join(testProjectRoot, 'next.config.js');
+      const content = await fs.promises.readFile(configFile, 'utf-8');
       
-      const content = await fs.promises.readFile(apiFile, 'utf-8');
-      expect(content).toContain('export async function GET');
-      expect(content).toContain('NextResponse.json');
+      expect(content).toContain('next-plugin-devtools-json');
+      expect(content).toContain('withDevToolsJSON');
+      expect(content).toContain('module.exports = withDevToolsJSON(nextConfig)');
+      expect(content).toContain('reactStrictMode: true'); // Preserve existing config
     });
 
-    it('should handle missing Next.js structure', async () => {
-      // Ensure the test directory is completely empty
-      await fs.promises.rm(testProjectRoot, { recursive: true, force: true });
-      await fs.promises.mkdir(testProjectRoot, { recursive: true });
+    it('should update existing ESM next.config.mjs', async () => {
+      // Create a basic package.json with Next.js dependency
+      const packageJson = {
+        name: 'test-project',
+        version: '1.0.0',
+        dependencies: {
+          next: '^14.0.0'
+        }
+      };
+      await fs.promises.writeFile(
+        path.join(testProjectRoot, 'package.json'),
+        JSON.stringify(packageJson, null, 2)
+      );
+
+      // Create an existing next.config.mjs
+      const existingConfig = `/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true
+};
+
+export default nextConfig;`;
       
+      await fs.promises.writeFile(
+        path.join(testProjectRoot, 'next.config.mjs'),
+        existingConfig
+      );
+
+      const { stdout } = await execAsync(`cd "${testProjectRoot}" && node "${setupScript}"`, {
+        env: { ...process.env, NODE_ENV: 'test' }
+      });
+      
+      expect(stdout).toContain('Updated next.config file');
+      
+      const configFile = path.join(testProjectRoot, 'next.config.mjs');
+      const content = await fs.promises.readFile(configFile, 'utf-8');
+      
+      expect(content).toContain('next-plugin-devtools-json');
+      expect(content).toContain('withDevToolsJSON');
+      expect(content).toContain('export default withDevToolsJSON(nextConfig)');
+      expect(content).toContain('reactStrictMode: true'); // Preserve existing config
+    });
+
+    it('should handle TypeScript next.config.ts', async () => {
+      // Create a basic package.json with Next.js dependency
+      const packageJson = {
+        name: 'test-project',
+        version: '1.0.0',
+        dependencies: {
+          next: '^14.0.0',
+          typescript: '^5.0.0'
+        }
+      };
+      await fs.promises.writeFile(
+        path.join(testProjectRoot, 'package.json'),
+        JSON.stringify(packageJson, null, 2)
+      );
+
+      // Create an existing next.config.ts
+      const existingConfig = `import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
+  reactStrictMode: true
+};
+
+export default nextConfig;`;
+      
+      await fs.promises.writeFile(
+        path.join(testProjectRoot, 'next.config.ts'),
+        existingConfig
+      );
+
+      const { stdout } = await execAsync(`cd "${testProjectRoot}" && node "${setupScript}"`, {
+        env: { ...process.env, NODE_ENV: 'test' }
+      });
+      
+      expect(stdout).toContain('Updated next.config file');
+      
+      const configFile = path.join(testProjectRoot, 'next.config.ts');
+      const content = await fs.promises.readFile(configFile, 'utf-8');
+      
+      expect(content).toContain('next-plugin-devtools-json');
+      expect(content).toContain('withDevToolsJSON');
+      expect(content).toContain('export default withDevToolsJSON(nextConfig)');
+      expect(content).toContain('reactStrictMode: true'); // Preserve existing config
+    });
+
+    it('should not overwrite already configured next.config', async () => {
+      // Create a basic package.json with Next.js dependency
+      const packageJson = {
+        name: 'test-project',
+        version: '1.0.0',
+        dependencies: {
+          next: '^14.0.0'
+        }
+      };
+      await fs.promises.writeFile(
+        path.join(testProjectRoot, 'package.json'),
+        JSON.stringify(packageJson, null, 2)
+      );
+
+      // Create a next.config.js that already has the plugin
+      const existingConfig = `const withDevToolsJSON = require('next-plugin-devtools-json');
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true
+};
+
+module.exports = withDevToolsJSON(nextConfig);`;
+      
+      await fs.promises.writeFile(
+        path.join(testProjectRoot, 'next.config.js'),
+        existingConfig
+      );
+
+      const { stdout } = await execAsync(`cd "${testProjectRoot}" && node "${setupScript}"`, {
+        env: { ...process.env, NODE_ENV: 'test' }
+      });
+      
+      expect(stdout).toContain('Plugin already configured');
+      
+      const configFile = path.join(testProjectRoot, 'next.config.js');
+      const content = await fs.promises.readFile(configFile, 'utf-8');
+      
+      // Should be unchanged
+      expect(content).toBe(existingConfig);
+    });
+
+    it('should fail when not in a Next.js project', async () => {
+      // Create a directory without package.json
       try {
-        const result = await execAsync(`cd "${testProjectRoot}" && node "${setupScript}" 2>&1`, {
+        await execAsync(`cd "${testProjectRoot}" && node "${setupScript}" 2>&1`, {
           env: { ...process.env, NODE_ENV: 'test' }
         });
-        console.log('Command succeeded unexpectedly:', result.stdout);
         expect.fail('Should have thrown an error');
       } catch (error: any) {
-        console.log('Error output:', error.stdout, 'stderr:', error.stderr);
         expect(error.code).toBe(1);
-        // Check both stdout and stderr since we're capturing both
         const output = (error.stdout || '') + (error.stderr || '');
-        expect(output).toContain('Could not detect Next.js structure');
+        expect(output).toContain('package.json not found');
       }
     });
 
-    it('should not overwrite existing API routes', async () => {
-      const pagesDir = path.join(testProjectRoot, 'pages', 'api');
-      await fs.promises.mkdir(pagesDir, { recursive: true });
-      
-      const existingFile = path.join(pagesDir, 'devtools-json.js');
-      const existingContent = '// Existing content';
-      await fs.promises.writeFile(existingFile, existingContent);
-      
+    it('should fail when Next.js is not in dependencies', async () => {
+      // Create a package.json without Next.js
+      const packageJson = {
+        name: 'test-project',
+        version: '1.0.0',
+        dependencies: {
+          react: '^18.0.0'
+        }
+      };
+      await fs.promises.writeFile(
+        path.join(testProjectRoot, 'package.json'),
+        JSON.stringify(packageJson, null, 2)
+      );
+
+      try {
+        await execAsync(`cd "${testProjectRoot}" && node "${setupScript}" 2>&1`, {
+          env: { ...process.env, NODE_ENV: 'test' }
+        });
+        expect.fail('Should have thrown an error');
+      } catch (error: any) {
+        expect(error.code).toBe(1);
+        const output = (error.stdout || '') + (error.stderr || '');
+        expect(output).toContain('Next.js not found in dependencies');
+      }
+    });
+  });
+
+  describe('#pluginFunctionality', () => {
+    it('should indicate that the endpoint will be available', async () => {
+      // Create a basic package.json with Next.js dependency
+      const packageJson = {
+        name: 'test-project',
+        version: '1.0.0',
+        dependencies: {
+          next: '^14.0.0'
+        }
+      };
+      await fs.promises.writeFile(
+        path.join(testProjectRoot, 'package.json'),
+        JSON.stringify(packageJson, null, 2)
+      );
+
       const { stdout } = await execAsync(`cd "${testProjectRoot}" && node "${setupScript}"`, {
         env: { ...process.env, NODE_ENV: 'test' }
       });
       
-      expect(stdout).toContain('already exists');
-      
-      const content = await fs.promises.readFile(existingFile, 'utf-8');
-      expect(content).toBe(existingContent); // Should not be overwritten
-    });
-  });
-
-  describe('#generatedAPIRoutes', () => {
-    it('should generate valid Pages Router API route', async () => {
-      const pagesDir = path.join(testProjectRoot, 'pages');
-      await fs.promises.mkdir(pagesDir, { recursive: true });
-      
-      await execAsync(`cd "${testProjectRoot}" && node "${setupScript}"`, {
-        env: { ...process.env, NODE_ENV: 'test' }
-      });
-      
-      const apiFile = path.join(testProjectRoot, 'pages', 'api', 'devtools-json.js');
-      const content = await fs.promises.readFile(apiFile, 'utf-8');
-      
-      // Check for required imports
-      expect(content).toContain('import fs from \'fs\'');
-      expect(content).toContain('import path from \'path\'');
-      expect(content).toContain('function generateUUID()');
-      
-      // Check for main function
-      expect(content).toContain('export default function handler');
-      expect(content).toContain('getOrCreateUUID');
-      
-      // Check for HTTP method handling
-      expect(content).toContain('req.method !== \'GET\'');
-      expect(content).toContain('res.status(405)');
-      
-      // Check for JSON response
-      expect(content).toContain('res.status(200).json(devtoolsJson)');
-    });
-
-    it('should generate valid App Router API route', async () => {
-      const appDir = path.join(testProjectRoot, 'app');
-      await fs.promises.mkdir(appDir, { recursive: true });
-      
-      await execAsync(`cd "${testProjectRoot}" && node "${setupScript}"`, {
-        env: { ...process.env, NODE_ENV: 'test' }
-      });
-      
-      const apiFile = path.join(testProjectRoot, 'app', 'api', 'devtools-json', 'route.js');
-      const content = await fs.promises.readFile(apiFile, 'utf-8');
-      
-      // Check for required imports
-      expect(content).toContain('import fs from \'fs\'');
-      expect(content).toContain('import path from \'path\'');
-      expect(content).toContain('function generateUUID()');
-      expect(content).toContain('import { NextResponse } from \'next/server\'');
-      
-      // Check for main function
-      expect(content).toContain('export async function GET');
-      expect(content).toContain('getOrCreateUUID');
-      
-      // Check for NextResponse usage
-      expect(content).toContain('NextResponse.json(devtoolsJson');
+      expect(stdout).toContain('/.well-known/appspecific/com.chrome.devtools.json');
+      expect(stdout).toContain('development mode');
+      expect(stdout).toContain('npm run dev');
     });
   });
 });
