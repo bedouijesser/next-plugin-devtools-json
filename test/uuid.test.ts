@@ -3,7 +3,7 @@ import path from 'path';
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { v4, validate } from 'uuid';
 
-// Since we don't have utils.ts compiled, let's create a test version
+// Test implementation of UUID utility function
 async function getOrCreateUUID(projectRoot: string, providedUuid?: string): Promise<string> {
   if (providedUuid) {
     return providedUuid;
