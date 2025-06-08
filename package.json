@@ -1,6 +1,6 @@
 {
   "name": "next-plugin-devtools-json",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Next.js plugin for serving Chrome DevTools project settings via webpack middleware - no API routes needed",
   "type": "module",
   "main": "dist/index.cjs",
