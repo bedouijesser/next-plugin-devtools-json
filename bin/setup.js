@@ -4,6 +4,52 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 
+function detectPackageManager() {
+  // Check for lock files to detect package manager
+  if (fs.existsSync('bun.lockb')) {
+    return 'bun';
+  }
+  if (fs.existsSync('pnpm-lock.yaml')) {
+    return 'pnpm';
+  }
+  if (fs.existsSync('yarn.lock')) {
+    return 'yarn';
+  }
+  if (fs.existsSync('package-lock.json')) {
+    return 'npm';
+  }
+  
+  // If no lock files, check if alternative package managers are available
+  try {
+    execSync('bun --version', { stdio: 'ignore' });
+    return 'bun';
+  } catch {}
+  
+  try {
+    execSync('pnpm --version', { stdio: 'ignore' });
+    return 'pnpm';
+  } catch {}
+  
+  try {
+    execSync('yarn --version', { stdio: 'ignore' });
+    return 'yarn';
+  } catch {}
+  
+  // Default to npm
+  return 'npm';
+}
+
+function getInstallCommand(packageManager) {
+  const commands = {
+    npm: 'npm install --save-dev next-plugin-devtools-json',
+    yarn: 'yarn add --dev next-plugin-devtools-json',
+    pnpm: 'pnpm add --save-dev next-plugin-devtools-json',
+    bun: 'bun add --dev next-plugin-devtools-json'
+  };
+  
+  return commands[packageManager] || commands.npm;
+}
+
 function detectNextConfigFile() {
   const configFiles = [
     'next.config.js',
@@ -48,12 +94,10 @@ const withDevToolsJSON = plugin.default || plugin;`
     ? `module.exports = withDevToolsJSON(nextConfig);`
     : `export default withDevToolsJSON(nextConfig);`;
 
-  const typeAnnotation = format === 'typescript' ? ': import(\'next\').NextConfig' : '';
-
   return `${pluginImport}
 
 /** @type {import('next').NextConfig} */
-const nextConfig${typeAnnotation} = {
+const nextConfig = {
   // Your Next.js config here
 };
 
@@ -62,7 +106,7 @@ ${exportStatement}`;
 
 function updateExistingConfig(filePath, content, format) {
   const pluginImport = format === 'commonjs' 
-    ? "const { default: withDevToolsJSON } = require('next-plugin-devtools-json');"
+    ? "const plugin = require('next-plugin-devtools-json');\nconst withDevToolsJSON = plugin.default || plugin;"
     : "import withDevToolsJSON from 'next-plugin-devtools-json';";
 
   let updatedContent = content;
@@ -125,6 +169,10 @@ function main() {
     process.exit(1);
   }
 
+  // Detect package manager
+  const packageManager = detectPackageManager();
+  console.log(`📦 Detected package manager: ${packageManager}`);
+
   // Check if package is already installed
   const isAlreadyInstalled = packageJson.devDependencies?.['next-plugin-devtools-json'] || 
                              packageJson.dependencies?.['next-plugin-devtools-json'];
@@ -132,12 +180,18 @@ function main() {
   if (!isAlreadyInstalled) {
     console.log('📦 Installing next-plugin-devtools-json as dev dependency...');
     try {
-      execSync('npm install --save-dev next-plugin-devtools-json', { stdio: 'inherit' });
+      const installCommand = getInstallCommand(packageManager);
+      console.log(`🏃 Running: ${installCommand}`);
+      execSync(installCommand, { stdio: 'inherit' });
       console.log('✅ Package installed successfully!');
     } catch (error) {
       console.error('❌ Failed to install package:', error.message);
+      console.error('\n💡 You can install manually with:');
+      console.error(`   ${getInstallCommand(packageManager)}`);
       process.exit(1);
     }
+  } else {
+    console.log('✅ Package already installed');
   }
 
   try {
@@ -164,10 +218,20 @@ function main() {
     }
 
     console.log('\n🎉 Setup complete!');
-    console.log('\n📖 The DevTools JSON endpoint will be available at:');
+    console.log('\n📖 The DevTools JSON endpoints will be available at:');
+    console.log('   /__devtools_json');
     console.log('   /.well-known/appspecific/com.chrome.devtools.json');
-    console.log('\n🚀 Start your development server with: npm run dev');
-    console.log('\n💡 The endpoint is only available in development mode for security.');
+    
+    const packageManager = detectPackageManager();
+    const runCommand = packageManager === 'yarn' ? 'yarn dev' : 
+                      packageManager === 'pnpm' ? 'pnpm dev' :
+                      packageManager === 'bun' ? 'bun dev' : 'npm run dev';
+    
+    console.log(`\n🚀 Start your development server with: ${runCommand}`);
+    console.log('\n💡 The endpoints are only available in development mode for security.');
+    console.log('\n📚 Manual installation alternative:');
+    console.log(`   1. Install: ${getInstallCommand(packageManager)}`);
+    console.log('   2. Update your next.config file with withDevToolsJSON()');
     console.log('\n📚 For more information, visit: https://github.com/bedouijesser/next-plugin-devtools-json');
 
   } catch (error) {

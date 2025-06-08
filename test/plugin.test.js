@@ -76,10 +76,17 @@ describe('#NextPluginDevToolsJSON', () => {
         
         const rewrites = await configWithPlugin.rewrites();
         expect(Array.isArray(rewrites)).toBe(true);
-        expect(rewrites.length).toBeGreaterThan(0);
-        expect(rewrites[0]).toHaveProperty('source', '/__devtools_json');
-        expect(rewrites[0]).toHaveProperty('destination');
-        expect(rewrites[0].destination).toContain('localhost:3001');
+        expect(rewrites.length).toBeGreaterThanOrEqual(2);
+        
+        // Check for custom endpoint rewrite
+        const customEndpointRewrite = rewrites.find(r => r.source === '/__devtools_json');
+        expect(customEndpointRewrite).toBeDefined();
+        expect(customEndpointRewrite.destination).toContain('localhost:3001');
+        
+        // Check for well-known endpoint rewrite
+        const wellKnownRewrite = rewrites.find(r => r.source === '/.well-known/appspecific/com.chrome.devtools.json');
+        expect(wellKnownRewrite).toBeDefined();
+        expect(wellKnownRewrite.destination).toContain('localhost:3001');
       } finally {
         // Restore original environment
         process.env.NODE_ENV = originalEnv;
@@ -134,17 +141,21 @@ describe('#NextPluginDevToolsJSON', () => {
         
         const rewrites = await configWithPlugin.rewrites();
         
-        // Should have both the DevTools rewrite and the existing ones
+        // Should have DevTools rewrites and the existing ones
         expect(Array.isArray(rewrites)).toBe(true);
-        expect(rewrites.length).toBe(2);
+        expect(rewrites.length).toBe(3); // 2 DevTools endpoints + 1 existing rewrite
         
-        // DevTools rewrite should be first
+        // DevTools rewrites should be first
         expect(rewrites[0]).toHaveProperty('source', '/__devtools_json');
         expect(rewrites[0]).toHaveProperty('destination');
         expect(rewrites[0].destination).toContain('localhost:3001');
         
+        expect(rewrites[1]).toHaveProperty('source', '/.well-known/appspecific/com.chrome.devtools.json');
+        expect(rewrites[1]).toHaveProperty('destination');
+        expect(rewrites[1].destination).toContain('localhost:3001');
+        
         // Existing rewrite should be preserved
-        expect(rewrites[1]).toEqual(existingRewrites[0]);
+        expect(rewrites[2]).toEqual(existingRewrites[0]);
       } finally {
         // Restore original environment
         process.env.NODE_ENV = originalEnv;

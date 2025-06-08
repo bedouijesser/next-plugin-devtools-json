@@ -300,7 +300,8 @@ module.exports = withDevToolsJSON(nextConfig);`;
       
       expect(stdout).toContain('/.well-known/appspecific/com.chrome.devtools.json');
       expect(stdout).toContain('development mode');
-      expect(stdout).toContain('npm run dev');
+      // Accept any package manager's dev command
+      expect(stdout).toMatch(/(npm run dev|yarn dev|pnpm dev|bun dev)/);
     });
   });
 });

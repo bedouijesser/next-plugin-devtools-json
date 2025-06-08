@@ -1,3 +1,8 @@
+import * as http from 'http';
+import * as url from 'url';
+import * as path from 'path';
+import * as fs from 'fs';
+
 interface DevToolsJSON {
   workspace?: {
     root: string;
@@ -9,6 +14,7 @@ interface DevToolsJSONOptions {
   uuid?: string;
   enabled?: boolean;
   endpoint?: string;
+  port?: number;
 }
 
 interface NextConfig {
@@ -19,6 +25,10 @@ interface NextConfig {
 
 // Global server instance to ensure we only start one
 let devToolsServer: any = null;
+let serverStarted = false;
+let cleanupHandlersRegistered = false;
+let cleanupTimeout: NodeJS.Timeout | null = null;
+let isCleaningUp = false;
 
 function withDevToolsJSON(nextConfig: NextConfig = {}, options: DevToolsJSONOptions = {}): NextConfig {
   // Only enable in development mode and if not explicitly disabled
@@ -27,48 +37,52 @@ function withDevToolsJSON(nextConfig: NextConfig = {}, options: DevToolsJSONOpti
   }
 
   // Start the DevTools server only once
-  if (!devToolsServer) {
+  if (!devToolsServer && !serverStarted) {
+    serverStarted = true;
     startDevToolsServer(options);
   }
 
   // Return config with optional rewrites for the main endpoint
   const originalRewrites = nextConfig.rewrites;
   const endpoint = options.endpoint || '/__devtools_json';
+  const port = options.port || 3001;
 
   return {
     ...nextConfig,
     async rewrites() {
       const existingRewrites = originalRewrites ? await (typeof originalRewrites === 'function' ? originalRewrites() : originalRewrites) : [];
       
-      // Add rewrite for our DevTools endpoint to the auxiliary server
-      const devToolsRewrite = {
-        source: endpoint,
-        destination: `http://localhost:3001${endpoint}`,
-      };
+      // Add rewrites for both endpoints to the auxiliary server
+      const devToolsRewrites = [
+        {
+          source: endpoint,
+          destination: `http://localhost:${port}${endpoint}`,
+        },
+        // Also support the traditional Chrome DevTools well-known path
+        {
+          source: '/.well-known/appspecific/com.chrome.devtools.json',
+          destination: `http://localhost:${port}${endpoint}`,
+        }
+      ];
 
       // Handle different rewrite structures
       if (Array.isArray(existingRewrites)) {
-        return [devToolsRewrite, ...existingRewrites];
+        return [...devToolsRewrites, ...existingRewrites];
       } else if (existingRewrites && typeof existingRewrites === 'object') {
         return {
           ...existingRewrites,
-          beforeFiles: [devToolsRewrite, ...(existingRewrites.beforeFiles || [])],
+          beforeFiles: [...devToolsRewrites, ...(existingRewrites.beforeFiles || [])],
         };
       } else {
-        return [devToolsRewrite];
+        return devToolsRewrites;
       }
     },
   };
 }
 
 function startDevToolsServer(options: DevToolsJSONOptions = {}) {
-  const http = require('http');
-  const url = require('url');
-  const path = require('path');
-  const fs = require('fs');
-  
   const endpoint = options.endpoint || '/__devtools_json';
-  const port = 3001;
+  let port = options.port || 3001;
 
   // Simple UUID generation function
   function generateUUID(): string {
@@ -91,7 +105,7 @@ function startDevToolsServer(options: DevToolsJSONOptions = {}) {
           return uuid;
         }
       } catch (error) {
-        console.warn('Failed to read existing UUID, generating new one:', error);
+        // Silent fallback to generating new UUID
       }
     }
 
@@ -101,57 +115,199 @@ function startDevToolsServer(options: DevToolsJSONOptions = {}) {
 
     const uuid = generateUUID();
     fs.writeFileSync(uuidPath, uuid, { encoding: 'utf-8' });
-    console.log(`Generated UUID '${uuid}' for DevTools project settings.`);
     return uuid;
   }
 
-  const server = http.createServer((req: any, res: any) => {
-    const parsedUrl = url.parse(req.url, true);
-    
-    if (parsedUrl.pathname === endpoint) {
-      try {
-        const projectRoot = process.cwd();
-        const uuid = options.uuid || getOrCreateUUID(projectRoot);
+  function tryStartServer(attempts = 0): void {
+    if (attempts > 10) {
+      // Silent failure after 10 attempts
+      return;
+    }
 
-        const devtoolsJson = {
-          workspace: {
-            root: projectRoot,
-            uuid,
-          },
+    const server = http.createServer((req: any, res: any) => {
+      const parsedUrl = url.parse(req.url, true);
+      
+      if (parsedUrl.pathname === endpoint) {
+        try {
+          const projectRoot = process.cwd();
+          const uuid = options.uuid || getOrCreateUUID(projectRoot);
+
+          const devtoolsJson = {
+            workspace: {
+              root: projectRoot,
+              uuid,
+            },
+          };
+
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.statusCode = 200;
+          res.end(JSON.stringify(devtoolsJson, null, 2));
+        } catch (error) {
+          res.statusCode = 500;
+          res.end('{}');
+        }
+      } else {
+        res.statusCode = 404;
+        res.end('Not Found');
+      }
+    });
+
+    server.listen(port, 'localhost', () => {
+      devToolsServer = server;
+      
+      // Register cleanup handlers only once
+      if (!cleanupHandlersRegistered) {
+        cleanupHandlersRegistered = true;
+        
+        const cleanup = () => {
+          // Prevent multiple simultaneous cleanup calls
+          if (isCleaningUp || !devToolsServer) {
+            return;
+          }
+          isCleaningUp = true;
+          
+          // Clear any pending timeout
+          if (cleanupTimeout) {
+            clearTimeout(cleanupTimeout);
+            cleanupTimeout = null;
+          }
+          
+          try {
+            // Force close all connections first
+            devToolsServer.closeAllConnections?.();
+            
+            // Close the server with proper callback
+            devToolsServer.close((err: Error | undefined) => {
+              if (err) {
+                // Force kill if graceful close fails
+                try {
+                  devToolsServer?.destroy?.();
+                } catch (destroyError) {
+                  // Silent cleanup
+                }
+              }
+              devToolsServer = null;
+              serverStarted = false;
+              isCleaningUp = false;
+            });
+            
+            // Add a timeout for forceful cleanup
+            cleanupTimeout = setTimeout(() => {
+              if (devToolsServer) {
+                try {
+                  devToolsServer.destroy?.();
+                  devToolsServer = null;
+                  serverStarted = false;
+                } catch (error) {
+                  // Silent cleanup
+                }
+              }
+              isCleaningUp = false;
+              cleanupTimeout = null;
+            }, 3000); // 3 second timeout
+            
+          } catch (error) {
+            // Silent cleanup
+            devToolsServer = null;
+            serverStarted = false;
+            isCleaningUp = false;
+          }
         };
 
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.statusCode = 200;
-        res.end(JSON.stringify(devtoolsJson, null, 2));
-      } catch (error) {
-        console.error('Error generating DevTools JSON:', error);
-        res.statusCode = 500;
-        res.end(JSON.stringify({}));
+        // Handle various termination scenarios
+        // Note: We don't need to remove these listeners since they're cleaned up
+        // automatically when the process exits
+        process.on('SIGTERM', cleanup);
+        process.on('SIGINT', cleanup);
+        process.on('SIGHUP', cleanup);
+        process.on('exit', cleanup);
+        process.on('beforeExit', cleanup);
+        
+        // Handle uncaught exceptions and promise rejections
+        process.on('uncaughtException', (error) => {
+          cleanup();
+          // Re-throw after cleanup
+          throw error;
+        });
+        
+        process.on('unhandledRejection', (reason, promise) => {
+          cleanup();
+          // Log but don't crash
+          console.error('Unhandled promise rejection:', reason);
+        });
       }
-    } else {
-      res.statusCode = 404;
-      res.end('Not Found');
-    }
-  });
+    });
 
-  server.listen(port, 'localhost', () => {
-    console.log(`🔧 DevTools JSON server running on http://localhost:${port}${endpoint}`);
-    devToolsServer = server;
-  });
+    server.on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        port++;
+        tryStartServer(attempts + 1);
+      }
+    });
+  }
 
-  server.on('error', (err: any) => {
-    if (err.code === 'EADDRINUSE') {
-      console.warn(`⚠️ Port ${port} is in use. DevTools endpoint may not work correctly.`);
-    } else {
-      console.error('DevTools server error:', err);
-    }
-  });
+  tryStartServer();
+}
 
-  // Graceful shutdown
-  process.on('SIGTERM', () => server.close());
-  process.on('SIGINT', () => server.close());
+// Export cleanup function for external use
+function cleanupDevToolsServer() {
+  // Prevent multiple simultaneous cleanup calls
+  if (isCleaningUp || !devToolsServer) {
+    return;
+  }
+  isCleaningUp = true;
+  
+  // Clear any pending timeout
+  if (cleanupTimeout) {
+    clearTimeout(cleanupTimeout);
+    cleanupTimeout = null;
+  }
+  
+  try {
+    // Force close all connections first
+    devToolsServer.closeAllConnections?.();
+    
+    // Close the server with proper callback
+    devToolsServer.close((err: Error | undefined) => {
+      if (err) {
+        // Force kill if graceful close fails
+        try {
+          devToolsServer?.destroy?.();
+        } catch (destroyError) {
+          // Silent cleanup
+        }
+      }
+      devToolsServer = null;
+      serverStarted = false;
+      cleanupHandlersRegistered = false;
+      isCleaningUp = false;
+    });
+    
+    // Add a timeout for forceful cleanup
+    cleanupTimeout = setTimeout(() => {
+      if (devToolsServer) {
+        try {
+          devToolsServer.destroy?.();
+          devToolsServer = null;
+          serverStarted = false;
+          cleanupHandlersRegistered = false;
+        } catch (error) {
+          // Silent cleanup
+        }
+      }
+      isCleaningUp = false;
+      cleanupTimeout = null;
+    }, 3000); // 3 second timeout
+    
+  } catch (error) {
+    // Silent cleanup
+    devToolsServer = null;
+    serverStarted = false;
+    cleanupHandlersRegistered = false;
+    isCleaningUp = false;
+  }
 }
 
 export default withDevToolsJSON;
-export { withDevToolsJSON, DevToolsJSON, DevToolsJSONOptions };
+export { withDevToolsJSON, DevToolsJSON, DevToolsJSONOptions, cleanupDevToolsServer };

@@ -1,6 +1,6 @@
 {
   "name": "next-plugin-devtools-json",
-  "version": "3.1.2",
+  "version": "3.1.5",
   "description": "Next.js plugin for Chrome DevTools project settings - seamless development integration with rewrites and standalone server",
   "type": "module",
   "main": "dist/index.cjs",
@@ -29,7 +29,8 @@
     "test:watch": "vitest --watch",
     "test:compatibility": "node scripts/test-compatibility.mjs",
     "test:quick": "node scripts/quick-test.mjs",
-    "test:all": "npm test && npm run test:quick",
+    "test:all": "npm test && npm run test:quick && npm run test:compatibility",
+    "cleanup": "node scripts/cleanup.mjs",
     "prepublishOnly": "npm run build && vitest run",
     "lint": "eslint src --ext .ts,.js",
     "typecheck": "tsc --noEmit"
@@ -45,7 +46,7 @@
   "author": "Jesser Bedoui <bedouijesser@gmail.com>",
   "license": "MIT",
   "peerDependencies": {
-    "next": ">=13.0.0"
+    "next": ">=12.0.0"
   },
   "devDependencies": {
     "@rollup/plugin-typescript": "^11.1.5",

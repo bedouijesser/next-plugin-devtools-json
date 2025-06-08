@@ -16,7 +16,7 @@ export default [
         rootDir: 'src'
       })
     ],
-    external: ['next', 'webpack', 'fs', 'path']
+    external: ['next', 'webpack', 'fs', 'path', 'http', 'url', 'child_process']
   },
   // CJS build
   {
@@ -46,6 +46,6 @@ export default [
         }
       }
     ],
-    external: ['next', 'webpack', 'fs', 'path']
+    external: ['next', 'webpack', 'fs', 'path', 'http', 'url', 'child_process']
   }
 ]
