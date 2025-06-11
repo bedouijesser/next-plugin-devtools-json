@@ -20,6 +20,7 @@ Thumbs.db
 
 # Testing
 coverage/
+.next/
 
 # Misc
 *.log

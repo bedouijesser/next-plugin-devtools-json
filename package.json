@@ -1,6 +1,6 @@
 {
   "name": "next-plugin-devtools-json",
-  "version": "3.1.5",
+  "version": "3.1.6",
   "description": "Next.js plugin for Chrome DevTools project settings - seamless development integration with rewrites and standalone server",
   "type": "module",
   "main": "dist/index.cjs",
